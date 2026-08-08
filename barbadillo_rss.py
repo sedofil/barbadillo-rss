@@ -109,21 +109,33 @@ def discover_articles(session):
     candidates = []
     seen = set()
 
-    # Barbadillo currently places article titles mainly in H3 elements.
-    selectors = ["h3 a[href]", "h2 a[href]", "article a[href]"]
-    for selector in selectors:
-        for a in soup.select(selector):
-            title = clean(a.get_text(" ", strip=True))
-            url = urljoin(SITE, a.get("href", ""))
-            if len(title) < 18 or not same_site_article(url):
-                continue
-            url = url.split("#", 1)[0]
-            if url in seen:
-                continue
-            seen.add(url)
-            candidates.append((title, url))
-            if len(candidates) >= MAX_ITEMS:
-                return candidates
+    for a in soup.find_all("a", href=True):
+        title = clean(a.get_text(" ", strip=True))
+        url = urljoin(SITE, a["href"]).split("#", 1)[0]
+
+        p = urlparse(url)
+
+        # Gli articoli Barbadillo hanno URL tipo:
+        # /132584-titolo-dell-articolo/
+        if p.netloc not in ("www.barbadillo.it", "barbadillo.it"):
+            continue
+
+        if not re.match(r"^/\d{4,}-", p.path):
+            continue
+
+        if len(title) < 15:
+            continue
+
+        if url in seen:
+            continue
+
+        seen.add(url)
+        candidates.append((title, url))
+
+        if len(candidates) >= MAX_ITEMS:
+            break
+
+    print(f"Link articolo individuati: {len(candidates)}")
     return candidates
 
 def build_feed(items):
